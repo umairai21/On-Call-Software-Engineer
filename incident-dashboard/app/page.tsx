@@ -1,118 +1,133 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import Image from "next/image";
 
 export default function Home() {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleSimulateCrash = async () => {
-    setLoading(true);
-    setResult(null);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/trigger-incident");
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Failed to trigger incident");
-        setIsModalOpen(true);
-      } else {
-        setResult(data);
-      }
-    } catch (err: any) {
-      setError(err?.message || "An unexpected error occurred");
-      setIsModalOpen(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [activeTab, setActiveTab] = useState("overview");
 
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black min-h-screen">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start gap-8">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            Incident Simulation Dashboard
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Trigger a simulated incident to capture Sentry logs and fetch Context.dev docs.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row w-full">
-          <button
-            onClick={handleSimulateCrash}
-            disabled={loading}
-            className="flex h-12 w-full items-center justify-center rounded-full bg-red-600 px-6 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50 md:w-auto cursor-pointer"
-          >
-            {loading ? "Simulating Crash..." : "Simulate System Crash"}
-          </button>
-        </div>
-
-        {result && (
-          <div className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-emerald-700 dark:text-emerald-300">
-            <h3 className="font-bold text-lg mb-2">✅ Incident Handled</h3>
-            <pre className="font-mono text-xs overflow-auto bg-black/5 dark:bg-white/5 p-3 rounded-lg">
-              {JSON.stringify(result, null, 2)}
-            </pre>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-indigo-500 selection:text-white">
+      {/* Navigation Header */}
+      <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 font-bold text-white shadow-lg shadow-indigo-500/20">
+              ⚡
+            </div>
+            <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+              On-Call Ops Platform
+            </span>
           </div>
-        )}
-      </main>
 
-      {/* Error Popup Modal */}
-      {isModalOpen && error && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-red-500/40 p-6 shadow-2xl text-white space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/20 text-red-500 font-bold text-xl">
-                  🚨
-                </div>
-                <h3 className="text-xl font-bold text-red-400">System Incident</h3>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-zinc-400 hover:text-white transition-colors text-lg font-bold px-2"
-              >
-                ✕
-              </button>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`transition-colors hover:text-white ${activeTab === "overview" ? "text-indigo-400 font-semibold" : ""}`}
+            >
+              Overview
+            </button>
+
+            <button
+              onClick={() => setActiveTab("analytics")}
+              className={`transition-colors hover:text-white ${activeTab === "analytics" ? "text-indigo-400 font-semibold" : ""}`}
+            >
+              System Health
+            </button>
+            <button
+              onClick={() => setActiveTab("docs")}
+              className={`transition-colors hover:text-white ${activeTab === "docs" ? "text-indigo-400 font-semibold" : ""}`}
+            >
+              Documentation
+            </button>
+          </nav>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              All Systems Operational
             </div>
 
-            <div className="rounded-xl bg-black/50 border border-red-500/20 p-4 font-mono text-sm text-red-300">
-              {error}
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-600/30 transition-all hover:bg-indigo-500 active:scale-95"
+            >
+              Launch Portal →
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <main className="mx-auto max-w-7xl px-6 pt-16 pb-24">
+        <div className="relative overflow-hidden rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900/90 to-zinc-950 p-8 md:p-16 shadow-2xl">
+          {/* Subtle Background Glow */}
+          <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none"></div>
+          <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-violet-500/10 blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10 max-w-3xl space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-300">
+              <span>🚀 Automated Incident Handling Engine</span>
             </div>
 
-            <p className="text-xs text-zinc-400">
-              This failure has been automatically logged and reported to Sentry.
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white leading-tight">
+              Real-time monitoring & software failure diagnosis.
+            </h1>
+
+            <p className="text-lg md:text-xl text-zinc-400 font-normal leading-relaxed">
+              Designed for on-call engineers. Monitor production health smoothly on this landing page, and navigate to the interactive workspace to inspect incident diagnostics.
             </p>
 
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-full bg-zinc-800 hover:bg-zinc-700 px-5 py-2 text-sm font-semibold text-white transition-colors cursor-pointer"
+            <div className="pt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <Link
+                href="/dashboard"
+                className="inline-flex h-12 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-8 font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-500/40 active:scale-95"
               >
-                Dismiss
+                Go to Workspace Portal →
+              </Link>
+              
+              <button
+                onClick={() => alert("System Status: All services are running optimally on the landing page.")}
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/60 px-6 font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+              >
+                Check System Diagnostics
               </button>
             </div>
           </div>
+
+          {/* Feature Highlights Grid */}
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 pt-12 border-t border-zinc-800/80">
+            <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/40 p-6 backdrop-blur-sm">
+              <div className="text-2xl mb-3">🛡️</div>
+              <h3 className="font-semibold text-white text-base mb-1">Zero Downtime Landing</h3>
+              <p className="text-sm text-zinc-400">
+                The main landing environment is completely isolated and operates at 99.99% uptime.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/40 p-6 backdrop-blur-sm">
+              <div className="text-2xl mb-3">⚡</div>
+              <h3 className="font-semibold text-white text-base mb-1">Instant Incident Routing</h3>
+              <p className="text-sm text-zinc-400">
+                Seamlessly jump to the next portal page to inspect simulated production exceptions.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/40 p-6 backdrop-blur-sm">
+              <div className="text-2xl mb-3">📊</div>
+              <h3 className="font-semibold text-white text-base mb-1">Sentry Telemetry</h3>
+              <p className="text-sm text-zinc-400">
+                Full stack traces captured silently and surfaced cleanly via UI popups.
+              </p>
+            </div>
+          </div>
         </div>
-      )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-zinc-900 bg-zinc-950 py-8 text-center text-xs text-zinc-500">
+        <p>© 2026 On-Call Software Engineer Platform. Built for reliability.</p>
+      </footer>
     </div>
   );
 }
-
-
-
