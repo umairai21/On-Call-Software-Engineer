@@ -20,16 +20,17 @@ export async function POST(req: NextRequest) {
     }
 
     const actionUrl = `${publicUrl}/api/twilio-handle-gather`;
-    const audioPromptUrl = `${publicUrl}/api/elevenlabs-voice-prompt`;
+    const promptText = encodeURIComponent("Hey there! I am your Devin on-call software engineer. I detected a crash in calculateUserDiscount on your website and opened a pull request on GitHub to fix it. Do you want me to merge it now?");
+    const audioPromptUrl = `${publicUrl}/api/elevenlabs-voice-prompt?text=${promptText}`;
 
-    // Return TwiML that plays the real ElevenLabs AI generated audio
+    // Return TwiML with <Gather> listening for speech ("Yes" / "No") or digits
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather input="speech dtmf" numDigits="1" speechTimeout="auto" action="${actionUrl}" method="POST">
+  <Gather input="speech dtmf" speechTimeout="auto" action="${actionUrl}" method="POST">
     <Play>${audioPromptUrl}</Play>
   </Gather>
   <Say voice="Polly.Joanna-Neural">
-    We didn't receive any confirmation. The pull request remains open for your manual review. Goodbye!
+    We didn't receive any response. The pull request remains open for your manual review. Goodbye!
   </Say>
   <Hangup/>
 </Response>`;

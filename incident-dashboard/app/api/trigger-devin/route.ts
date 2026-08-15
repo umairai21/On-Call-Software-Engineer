@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Background poller to monitor GitHub PRs and trigger the phone call once the PR is open
-async function pollGitHubAndCall(origin: string) {
-  console.log("🕵️‍♂️ [Devin Bridge] Starting background polling for new GitHub Pull Requests...");
+// Background poller to monitor GitHub PRs and trigger the phone call ONLY when a NEW PR is open
+async function pollGitHubAndCall(origin: string, initialLatestPRNumber: number, sessionStartTime: Date) {
+  console.log(`🕵️‍♂️ [Devin Bridge] Starting background polling for new GitHub Pull Requests (tracking after PR #${initialLatestPRNumber})...`);
   
-  const maxAttempts = 40; // 10 minutes total (40 attempts * 15 seconds)
+  const maxAttempts = 60; // 15 minutes total (60 attempts * 15 seconds)
   let attempts = 0;
   
   const interval = setInterval(async () => {
     attempts++;
     if (attempts > maxAttempts) {
-      console.log("⚠️ [Devin Bridge] Polling timed out. No Pull Request detected after 10 minutes.");
+      console.log("⚠️ [Devin Bridge] Polling timed out. No new Pull Request detected after 15 minutes.");
       clearInterval(interval);
       return;
     }
     
     try {
       console.log(`🕵️‍♂️ [Devin Bridge] Polling GitHub PRs (attempt ${attempts}/${maxAttempts})...`);
-      const response = await fetch("https://api.github.com/repos/umairai21/On-Call-Software-Engineer/pulls", {
+      const response = await fetch("https://api.github.com/repos/umairai21/On-Call-Software-Engineer/pulls?state=all&sort=created&direction=desc", {
         headers: {
           "User-Agent": "NextJs-Devin-Bridge",
           "Accept": "application/vnd.github.v3+json"
@@ -30,21 +30,22 @@ async function pollGitHubAndCall(origin: string) {
       
       const pulls = await response.json();
       
-      // Check if there is an open PR created by Devin or containing key title terms
-      const targetPR = pulls.find((pr: any) => 
+      // Check if there is a NEW PR opened after this incident started
+      const newPR = pulls.find((pr: any) => 
         pr.state === "open" && 
-        (pr.title.toLowerCase().includes("typeerror") || 
-         pr.title.toLowerCase().includes("calculateuserdiscount") || 
-         pr.user.login.toLowerCase().includes("devin"))
+        pr.number > initialLatestPRNumber &&
+        new Date(pr.created_at) >= sessionStartTime
       );
       
-      if (targetPR) {
-        console.log(`🚀 [Devin Bridge] DETECTED new Devin Pull Request: "${targetPR.title}" (PR #${targetPR.number})!`);
+      if (newPR) {
+        console.log(`🚀 [Devin Bridge] DETECTED brand new Devin Pull Request: "${newPR.title}" (PR #${newPR.number})!`);
         clearInterval(interval);
         
-        // Trigger the outbound call
-        console.log("📞 [Devin Bridge] Initiating outbound on-call telephony...");
-        await fetch(`${origin}/api/trigger-call`, { method: "POST" });
+        // Wait 3 seconds to let Devin finish any initial PR checks, then call
+        setTimeout(async () => {
+          console.log("📞 [Devin Bridge] Initiating outbound on-call telephony...");
+          await fetch(`${origin}/api/trigger-call`, { method: "POST" });
+        }, 3000);
       }
     } catch (e: any) {
       console.error("❌ [Devin Bridge] Error polling GitHub PRs:", e.message);
@@ -60,6 +61,28 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.DEVIN_API_KEY?.trim();
     const orgId = process.env.DEVIN_ORG_ID?.trim();
     const origin = new URL(req.url).origin;
+    const sessionStartTime = new Date();
+
+    // Check existing latest PR number so we don't trigger prematurely on old PRs
+    let latestPRNumber = 0;
+    try {
+      const existingPRsRes = await fetch("https://api.github.com/repos/umairai21/On-Call-Software-Engineer/pulls?state=all&per_page=5", {
+        headers: {
+          "User-Agent": "NextJs-Devin-Bridge",
+          "Accept": "application/vnd.github.v3+json"
+        }
+      });
+      if (existingPRsRes.ok) {
+        const existingPRs = await existingPRsRes.json();
+        if (existingPRs.length > 0) {
+          latestPRNumber = Math.max(...existingPRs.map((p: any) => p.number || 0));
+        }
+      }
+    } catch (e: any) {
+      console.warn("⚠️ [Devin Bridge] Could not fetch initial PR list:", e.message);
+    }
+
+    console.log(`📊 [Devin Bridge] Initial baseline PR number is #${latestPRNumber}`);
 
     const promptText = `Please fix the following runtime error in the repository:
 Error details: ${message}
@@ -102,8 +125,8 @@ Instructions:
 
       console.log("✅ [Devin Bridge] Devin session successfully triggered:", sessionId);
       
-      // Start polling in background (non-blocking)
-      pollGitHubAndCall(origin);
+      // Start polling for the newly created PR
+      pollGitHubAndCall(origin, latestPRNumber, sessionStartTime);
 
       return NextResponse.json({
         success: true,
@@ -116,12 +139,12 @@ Instructions:
       console.log("ℹ️ [Devin Bridge] DEVIN_API_KEY or DEVIN_ORG_ID not configured in .env.local.");
       console.log("ℹ️ [Devin Bridge] Running in Simulation Mode.");
       
-      // Simulate Devin fixing code in the background (waits 5 seconds, then triggers call)
+      // Simulate Devin fixing code in the background (waits 15 seconds, then triggers call)
       setTimeout(async () => {
         console.log("🕵️‍♂️ [Devin Bridge Simulation] Simulated Devin PR created: 'Fix TypeError in calculateUserDiscount'");
         console.log("📞 [Devin Bridge Simulation] Triggering outbound call...");
         await fetch(`${origin}/api/trigger-call`, { method: "POST" });
-      }, 5000);
+      }, 15000);
 
       return NextResponse.json({
         success: true,

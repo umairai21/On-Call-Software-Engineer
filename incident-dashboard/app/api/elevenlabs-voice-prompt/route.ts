@@ -5,10 +5,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const message =
       searchParams.get("text") ||
-      "Hey there! I am your Devin on-call software engineer. I detected a crash in calculateUserDiscount on your website and opened a pull request on GitHub to fix it. Say Yes, or press 1, to automatically merge the fix now.";
+      "Hey there! I am your Devin on-call software engineer. I detected a crash in calculateUserDiscount on your website and opened a pull request on GitHub to fix it. Do you want me to merge it now?";
 
     const elevenlabsKey = process.env.ELEVENLABS_API_KEY?.trim();
-    // Default to the popular Rachel voice or configured voice
+    // Rachel voice or configured voice
     const voiceId = "21m00Tcm4TlvDq8ikWAM"; 
 
     if (!elevenlabsKey) {
