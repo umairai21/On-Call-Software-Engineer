@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 
 // Intentional Bug: This helper function expects a user object with a profile,
 // but gets called with null/undefined data when accessed.
@@ -14,8 +13,7 @@ export async function GET() {
     const discount = calculateUserDiscount(userData);
     return NextResponse.json({ discount });
   } catch (err: any) {
-    // Explicitly send exception to Sentry dashboard
-    Sentry.captureException(err);
+    console.error("Incident triggered:", err.message);
 
     return NextResponse.json(
       {
@@ -29,9 +27,3 @@ export async function GET() {
     );
   }
 }
-
-
-
-
-
-
