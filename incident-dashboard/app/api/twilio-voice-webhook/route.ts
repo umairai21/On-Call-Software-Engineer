@@ -12,6 +12,14 @@ export async function POST(req: NextRequest) {
       throw new Error("ELEVENLABS_API_KEY or ELEVENLABS_AGENT_ID environment variables are missing.");
     }
 
+    const formData = await req.formData().catch(() => null);
+    const toNumber = formData?.get("To")?.toString() || process.env.USER_PHONE_NUMBER?.trim();
+    const fromNumber = formData?.get("From")?.toString() || process.env.TWILIO_PHONE_NUMBER?.trim() || "+15005550006";
+
+    if (!toNumber) {
+      throw new Error("Recipient phone number (To) could not be resolved.");
+    }
+
     // Call the ElevenLabs Register Call endpoint to get the TwiML connection XML
     const response = await fetch("https://api.elevenlabs.io/v1/convai/twilio/register-call", {
       method: "POST",
@@ -21,7 +29,8 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         agent_id: agentId,
-        from_number: twilioPhone || "+15005550006", // Fallback test Twilio number
+        to_number: toNumber,
+        from_number: fromNumber,
       }),
     });
 

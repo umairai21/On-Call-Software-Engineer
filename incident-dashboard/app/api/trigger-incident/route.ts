@@ -16,7 +16,7 @@ function calculateUserDiscount(user?: User | null): number {
 }
 
 export async function GET() {
-  const userData: User | undefined = undefined;
+  const userData: User = { profile: { tier: "VIP" } };
   const discount = calculateUserDiscount(userData);
 
   return NextResponse.json({ discount });
