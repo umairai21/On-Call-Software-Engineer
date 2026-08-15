@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 
-// Intentional Bug: This helper function expects a user object with a profile,
-// but gets called with null/undefined data when accessed.
-function calculateUserDiscount(user: any) {
-  // 🚨 REAL CODE BUG: Will throw TypeError: Cannot read properties of undefined (reading 'tier')
-  return user.profile.tier === "VIP" ? 0.20 : 0.05;
+type User = {
+  profile?: {
+    tier?: string;
+  };
+};
+
+const VIP_DISCOUNT = 0.2;
+const DEFAULT_DISCOUNT = 0.05;
+
+function calculateUserDiscount(user?: User | null) {
+  return user?.profile?.tier === "VIP" ? VIP_DISCOUNT : DEFAULT_DISCOUNT;
 }
 
 export async function GET() {
@@ -12,16 +18,17 @@ export async function GET() {
     const userData = { profile: { tier: "VIP" } }; // Fixed by Devin
     const discount = calculateUserDiscount(userData);
     return NextResponse.json({ discount });
-  } catch (err: any) {
-    console.error("Incident triggered:", err.message);
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : undefined;
+    console.error("Incident triggered:", error?.message);
 
     return NextResponse.json(
       {
-        error: err?.message || "TypeError: Cannot read properties of undefined (reading 'tier')",
+        error: error?.message || "Unexpected error while calculating the user discount",
         code: "ERR_UNHANDLED_TYPE_ERROR",
         timestamp: new Date().toISOString(),
-        location: "calculateUserDiscount (app/api/trigger-incident/route.ts:7:15)",
-        stack: err?.stack || "TypeError: Cannot read properties of undefined (reading 'tier')\n    at calculateUserDiscount (app/api/trigger-incident/route.ts:7:15)\n    at GET (app/api/trigger-incident/route.ts:14:22)"
+        location: "calculateUserDiscount (app/api/trigger-incident/route.ts)",
+        stack: error?.stack
       },
       { status: 500 }
     );
