@@ -1,5 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 
+async function getPublicUrl(origin: string): Promise<string> {
+  // 1. Try to fetch from local ngrok client API
+  try {
+    const res = await fetch("http://127.0.0.1:4040/api/tunnels");
+    if (res.ok) {
+      const data = await res.json();
+      const httpsTunnel = data.tunnels?.find((t: any) => t.proto === "https" || t.public_url?.startsWith("https"));
+      if (httpsTunnel?.public_url) {
+        console.log("🔗 [Telephony Bridge] Dynamically detected ngrok tunnel URL:", httpsTunnel.public_url);
+        return httpsTunnel.public_url;
+      }
+    }
+  } catch (e) {
+    // ngrok is either not running or API is unreachable
+  }
+
+  // 2. Try to read from environment variable
+  const envUrl = process.env.PUBLIC_URL?.trim() || process.env.NGROK_URL?.trim();
+  if (envUrl) {
+    console.log("🔗 [Telephony Bridge] Using public URL from environment variable:", envUrl);
+    return envUrl;
+  }
+
+  // 3. Fallback to origin
+  console.warn("⚠️ [Telephony Bridge] Public tunnel URL not found. Falling back to request origin:", origin);
+  return origin;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const origin = new URL(req.url).origin;
@@ -23,13 +51,14 @@ export async function POST(req: NextRequest) {
       console.log(`📞 [Twilio] Initiating direct outbound call from ${twilioPhone} to ${toNumber}...`);
       
       const basicAuth = Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
+      const publicUrl = await getPublicUrl(origin);
       
       // Form urlencode the body for Twilio Calls API
       const formData = new URLSearchParams();
       formData.append("To", toNumber!);
       formData.append("From", twilioPhone!);
       // Point Twilio to our local voice webhook which bridges to ElevenLabs
-      formData.append("Url", `${origin}/api/twilio-voice-webhook`);
+      formData.append("Url", `${publicUrl}/api/twilio-voice-webhook`);
 
       const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Calls.json`, {
         method: "POST",
