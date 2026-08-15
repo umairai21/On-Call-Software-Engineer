@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
 
-// Intentional Bug: This helper function expects a user object with a profile,
-// but gets called with null/undefined data when accessed.
-function calculateUserDiscount(user: any) {
-  // 🚨 REAL CODE BUG: Will throw TypeError: Cannot read properties of undefined (reading 'tier')
-  return user.profile.tier === "VIP" ? 0.20 : 0.05;
+const VIP_DISCOUNT = 0.2;
+const DEFAULT_DISCOUNT = 0.05;
+
+type User = {
+  profile?: {
+    tier?: string;
+  };
+};
+
+function calculateUserDiscount(user?: User | null): number {
+  return user?.profile?.tier === "VIP" ? VIP_DISCOUNT : DEFAULT_DISCOUNT;
 }
 
 export async function GET() {
   try {
-    const userData = { profile: { tier: "VIP" } }; // Fixed by Devin
+    const userData: User = { profile: { tier: "VIP" } };
     const discount = calculateUserDiscount(userData);
     return NextResponse.json({ discount });
   } catch (err: any) {
