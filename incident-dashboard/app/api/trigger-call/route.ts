@@ -2,25 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
+    const origin = new URL(req.url).origin;
+
+    // Twilio credentials
+    const twilioSid = process.env.TWILIO_ACCOUNT_SID?.trim();
+    const twilioToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+    const twilioPhone = process.env.TWILIO_PHONE_NUMBER?.trim();
+    
+    // ElevenLabs credentials for verification
+    const elevenlabsKey = process.env.ELEVENLABS_API_KEY?.trim();
     const agentId = process.env.ELEVENLABS_AGENT_ID?.trim();
-    const phoneId = process.env.ELEVENLABS_PHONE_NUMBER_ID?.trim();
+    
+    // User Phone
     const toNumber = process.env.USER_PHONE_NUMBER?.trim();
 
-    if (apiKey && agentId && phoneId && toNumber) {
-      console.log(`📞 [ElevenLabs] Triggering outbound call to ${toNumber} using Agent ${agentId}...`);
+    const isTwilioConfigured = twilioSid && twilioToken && twilioPhone && toNumber;
+    const isElevenLabsConfigured = elevenlabsKey && agentId;
+
+    if (isTwilioConfigured && isElevenLabsConfigured) {
+      console.log(`📞 [Twilio] Initiating direct outbound call from ${twilioPhone} to ${toNumber}...`);
       
-      const response = await fetch("https://api.elevenlabs.io/v1/convai/twilio/outbound-call", {
+      const basicAuth = Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
+      
+      // Form urlencode the body for Twilio Calls API
+      const formData = new URLSearchParams();
+      formData.append("To", toNumber!);
+      formData.append("From", twilioPhone!);
+      // Point Twilio to our local voice webhook which bridges to ElevenLabs
+      formData.append("Url", `${origin}/api/twilio-voice-webhook`);
+
+      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Calls.json`, {
         method: "POST",
         headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
+          "Authorization": `Basic ${basicAuth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: JSON.stringify({
-          agent_id: agentId,
-          agent_phone_number_id: phoneId,
-          to_number: toNumber,
-        }),
+        body: formData.toString(),
       });
 
       const responseText = await response.text();
@@ -28,21 +45,22 @@ export async function POST(req: NextRequest) {
       try {
         data = JSON.parse(responseText);
       } catch (e) {
-        throw new Error(`Failed to parse ElevenLabs response: ${responseText}`);
+        throw new Error(`Failed to parse Twilio response: ${responseText}`);
       }
 
       if (!response.ok) {
-        throw new Error(data?.detail?.message || `ElevenLabs error: ${response.status} ${response.statusText}`);
+        throw new Error(data?.message || `Twilio API error: ${response.status} ${response.statusText}`);
       }
 
-      console.log("✅ [ElevenLabs] Phone call successfully dispatched! Call ID:", data.call_id);
+      console.log("✅ [Twilio] Outbound call successfully placed! SID:", data.sid);
       return NextResponse.json({
         success: true,
         simulated: false,
-        callId: data.call_id,
-        message: "Outbound call successfully initiated.",
+        callSid: data.sid,
+        message: "Direct Twilio call placed successfully. Awaiting webhook handoff.",
       });
     } else {
+      // Simulation mode fallback
       const displayPhone = toNumber || "+1 (555) 019-9921";
       console.log(`📞 [ElevenLabs Simulation] Dialing user phone number at ${displayPhone}...`);
       console.log("📞 [ElevenLabs Simulation] RING... RING... RING...");
@@ -58,9 +76,9 @@ export async function POST(req: NextRequest) {
       });
     }
   } catch (err: any) {
-    console.error("❌ [ElevenLabs Bridge] Failed to place outbound call:", err.message);
+    console.error("❌ [Telephony Bridge] Outbound call failure:", err.message);
     return NextResponse.json(
-      { success: false, error: err.message || "Failed to place outbound call" },
+      { success: false, error: err.message || "Failed to trigger outbound call" },
       { status: 500 }
     );
   }
