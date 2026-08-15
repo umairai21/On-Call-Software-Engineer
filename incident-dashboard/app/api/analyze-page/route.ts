@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3b. For localhost pages, if the static scrape did not find the error (because the error modal
-    // is rendered on the client side after a fetch), check the incident API endpoint directly.
-    if (isLocalhost && url.includes("/dashboard")) {
+    // 3b. For localhost pages, check the incident API endpoint directly to see if the codebase
+    // currently has an active unhandled exception.
+    if (isLocalhost) {
       try {
         const origin = new URL(url).origin;
         const apiRes = await fetch(`${origin}/api/trigger-incident`);

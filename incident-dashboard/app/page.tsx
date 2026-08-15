@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -49,8 +49,13 @@ export default function Home() {
     }
   };
 
+  const initialized = useRef(false);
+
   // On page mount: Ensure page starts in a clean/healthy state, then auto-scan
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
     const initializePage = async () => {
       try {
         // Reset the codebase bug to healthy state for initial load

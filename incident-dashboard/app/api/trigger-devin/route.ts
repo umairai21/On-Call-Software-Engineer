@@ -44,12 +44,15 @@ Instructions:
         throw new Error(data?.message || `Devin API error: ${response.status} ${response.statusText}`);
       }
 
-      console.log("✅ [Devin Bridge] Devin session successfully triggered:", data.id);
+      const sessionId = data.session_id || data.id;
+      const sessionUrl = data.url || `https://devin.ai/sessions/${sessionId}`;
+
+      console.log("✅ [Devin Bridge] Devin session successfully triggered:", sessionId);
       return NextResponse.json({
         success: true,
         simulated: false,
-        sessionId: data.id,
-        sessionUrl: `https://devin.ai/sessions/${data.id}`,
+        sessionId,
+        sessionUrl,
         prompt: promptText,
       });
     } else {
