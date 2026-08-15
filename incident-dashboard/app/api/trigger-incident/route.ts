@@ -9,7 +9,7 @@ function calculateUserDiscount(user: any) {
 
 export async function GET() {
   try {
-    const userData = { profile: { tier: "VIP" } }; // Fixed by Devin
+    const userData = undefined; // Bug: User data is missing!
     const discount = calculateUserDiscount(userData);
     return NextResponse.json({ discount });
   } catch (err: any) {

@@ -2,62 +2,54 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    console.log("📥 [Twilio Webhook] Call answered. Fetching streaming TwiML from ElevenLabs...");
+    console.log("📥 [Twilio Webhook] Call answered. Preparing ElevenLabs voice alert...");
 
-    const elevenlabsKey = process.env.ELEVENLABS_API_KEY?.trim();
-    const agentId = process.env.ELEVENLABS_AGENT_ID?.trim();
-    const twilioPhone = process.env.TWILIO_PHONE_NUMBER?.trim();
-
-    if (!elevenlabsKey || !agentId) {
-      throw new Error("ELEVENLABS_API_KEY or ELEVENLABS_AGENT_ID environment variables are missing.");
+    // Dynamically detect ngrok public tunnel URL
+    let publicUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    try {
+      const ngrokRes = await fetch("http://127.0.0.1:4040/api/tunnels");
+      if (ngrokRes.ok) {
+        const data = await ngrokRes.json();
+        const httpsTunnel = data.tunnels?.find((t: any) => t.proto === "https");
+        if (httpsTunnel?.public_url) {
+          publicUrl = httpsTunnel.public_url;
+        }
+      }
+    } catch {
+      // Fallback
     }
 
-    const formData = await req.formData().catch(() => null);
-    const toNumber = formData?.get("To")?.toString() || process.env.USER_PHONE_NUMBER?.trim();
-    const fromNumber = formData?.get("From")?.toString() || process.env.TWILIO_PHONE_NUMBER?.trim() || "+15005550006";
+    const actionUrl = `${publicUrl}/api/twilio-handle-gather`;
+    const audioPromptUrl = `${publicUrl}/api/elevenlabs-voice-prompt`;
 
-    if (!toNumber) {
-      throw new Error("Recipient phone number (To) could not be resolved.");
-    }
+    // Return TwiML that plays the real ElevenLabs AI generated audio
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather input="speech dtmf" numDigits="1" speechTimeout="auto" action="${actionUrl}" method="POST">
+    <Play>${audioPromptUrl}</Play>
+  </Gather>
+  <Say voice="Polly.Joanna-Neural">
+    We didn't receive any confirmation. The pull request remains open for your manual review. Goodbye!
+  </Say>
+  <Hangup/>
+</Response>`;
 
-    // Call the ElevenLabs Register Call endpoint to get the TwiML connection XML
-    const response = await fetch("https://api.elevenlabs.io/v1/convai/twilio/register-call", {
-      method: "POST",
-      headers: {
-        "xi-api-key": elevenlabsKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        agent_id: agentId,
-        to_number: toNumber,
-        from_number: fromNumber,
-      }),
-    });
+    console.log(`✅ [Twilio Webhook] Dispatched Gather with ElevenLabs audio: ${audioPromptUrl}`);
 
-    const twimlXml = await response.text();
-
-    if (!response.ok) {
-      throw new Error(`ElevenLabs Register-Call failed: ${response.status} ${twimlXml}`);
-    }
-
-    console.log("✅ [Twilio Webhook] Received TwiML from ElevenLabs. Handoff successfully dispatched.");
-
-    // Return TwiML XML directly to Twilio
-    return new NextResponse(twimlXml, {
+    return new NextResponse(twiml, {
       headers: {
         "Content-Type": "text/xml",
       },
     });
   } catch (err: any) {
-    console.error("❌ [Twilio Webhook] Handoff failed:", err.message);
-    
-    // Return a default TwiML error message to hang up the call cleanly if something goes wrong
+    console.error("❌ [Twilio Webhook] Failed:", err.message);
+
     const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say>An error occurred connecting your call to the voice assistant. Goodbye.</Say>
-  <Reject/>
+  <Say voice="Polly.Joanna-Neural">An error occurred in your on-call system. Goodbye.</Say>
+  <Hangup/>
 </Response>`;
-    
+
     return new NextResponse(errorTwiml, {
       headers: {
         "Content-Type": "text/xml",
