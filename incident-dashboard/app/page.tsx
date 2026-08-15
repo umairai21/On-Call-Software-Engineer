@@ -5,13 +5,18 @@ import { useState, useEffect, useRef } from "react";
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isAuditing, setIsAuditing] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Simulated phone call states
+  const [callState, setCallState] = useState<"idle" | "ringing" | "answered" | "merged" | "rejected">("idle");
+  const [isMerging, setIsMerging] = useState(false);
 
   // Run the Context.dev audit scan and print logs directly to the browser console
-  const runLandingAudit = async (stage: "initial" | "after_click") => {
+  const runLandingAudit = async (stage: "initial" | "after_click" | "after_merge") => {
     if (isAuditing) return;
     setIsAuditing(true);
 
-    console.log(`🚀 [Context.dev] Running page audit scan (${stage === "initial" ? "initial load" : "after action"})...`);
+    console.log(`🚀 [Context.dev] Running page audit scan (${stage === "initial" ? "initial load" : stage === "after_click" ? "after action" : "after hotfix merge"})...`);
     console.log("🔌 [Context.dev] Connecting to local origin: " + window.location.origin);
     console.log("📄 [Context.dev] Scanning document layout from top to bottom...");
 
@@ -27,6 +32,7 @@ export default function Home() {
       const data = await res.json();
       
       if (data.errorDetected) {
+        setHasError(true);
         console.error("💥 [Context.dev] Unhandled Exception DETECTED on page!");
         console.error(`🐞 Error details: "${data.errorDetails?.message}"`);
         console.warn(`📍 Code Location: ${data.errorDetails?.location}`);
@@ -35,6 +41,11 @@ export default function Home() {
           if (data.devinResult.success) {
             if (data.devinResult.simulated) {
               console.log("🚀 [Devin Bridge] Simulated Devin session logged to server console.");
+              
+              // Trigger the simulated phone call flow in 5 seconds
+              setTimeout(() => {
+                setCallState("ringing");
+              }, 5000);
             } else {
               console.log("🚀 [Devin Bridge] Devin session successfully triggered!");
               console.log("🔗 Track session here: " + data.devinResult.sessionUrl);
@@ -44,6 +55,7 @@ export default function Home() {
           }
         }
       } else {
+        setHasError(false);
         console.log("✅ [Context.dev] Audit complete: 0 errors detected. Page is fully operational.");
       }
     } catch (err: any) {
@@ -81,6 +93,7 @@ export default function Home() {
 
   const handleAddToCart = async () => {
     console.log("🛒 [Action] User clicked 'Add to Cart'. Processing transaction...");
+    setCallState("idle");
 
     try {
       // 1. Break the codebase backend endpoint to simulate the bug triggering
@@ -99,6 +112,40 @@ export default function Home() {
 
     // 3. Automatically trigger Context.dev scan to detect the error
     runLandingAudit("after_click");
+  };
+
+  // Simulating user answering call or clicking Merge from Phone/UI
+  const handlePRDecision = async (approve: boolean) => {
+    if (approve) {
+      setIsMerging(true);
+      console.log("📞 [Call Loop] PR Merge approved. Call webhook /api/elevenlabs-merge...");
+      try {
+        const res = await fetch("/api/elevenlabs-merge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          setCallState("merged");
+          console.log("✅ [Call Loop] Webhook merge completed successfully. Code is operational!");
+          
+          // Recheck system health state
+          await new Promise((r) => setTimeout(r, 1000));
+          await runLandingAudit("after_merge");
+        } else {
+          console.error("❌ [Call Loop] Webhook merge failed: " + data.error);
+        }
+      } catch (err: any) {
+        console.error("❌ [Call Loop] Resolution error: " + err.message);
+      } finally {
+        setIsMerging(false);
+      }
+    } else {
+      setCallState("rejected");
+      console.log("❌ [Call Loop] PR Merge rejected by user. Standing down.");
+    }
   };
 
   return (
@@ -206,6 +253,100 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* ELEVENLABS FLOATING TELEPHONY SIMULATOR PANEL */}
+      {callState !== "idle" && (
+        <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm rounded-2xl border border-violet-500/50 bg-zinc-900/95 backdrop-blur-md p-6 shadow-2xl text-white space-y-4 animate-in slide-in-from-bottom duration-200">
+          <div className="flex items-center gap-3">
+            {callState === "ringing" && (
+              <span className="flex h-3 w-3 rounded-full bg-violet-400 animate-ping"></span>
+            )}
+            {callState === "answered" && (
+              <span className="flex h-3 w-3 rounded-full bg-emerald-400 animate-pulse"></span>
+            )}
+            {callState === "merged" && (
+              <span className="flex h-3 w-3 rounded-full bg-emerald-400"></span>
+            )}
+            {callState === "rejected" && (
+              <span className="flex h-3 w-3 rounded-full bg-red-500"></span>
+            )}
+            
+            <h3 className="text-xs uppercase tracking-wider font-bold text-violet-400">
+              {callState === "ringing" ? "Incoming Voice Call..." : "ElevenLabs Voice Assistant"}
+            </h3>
+          </div>
+
+          {callState === "ringing" && (
+            <div className="flex flex-col items-center py-4 space-y-3">
+              <div className="text-3xl animate-bounce">📞</div>
+              <div className="text-sm font-bold">Devin On-Call Agent</div>
+              <div className="text-xs text-zinc-400 italic">Dialing your phone number...</div>
+              
+              <button
+                onClick={() => setCallState("answered")}
+                className="w-full rounded-xl bg-violet-600 hover:bg-violet-500 py-2 text-xs font-bold text-white shadow-md cursor-pointer mt-2"
+              >
+                Answer Call
+              </button>
+            </div>
+          )}
+
+          {callState === "answered" && (
+            <div className="space-y-4">
+              <p className="text-xs italic text-zinc-300 leading-relaxed bg-zinc-950/50 p-3 rounded-xl border border-zinc-800">
+                &quot;Hey there! I am your Devin on-call assistant. I detected a TypeError in calculateUserDiscount and opened a pull request on your GitHub. Do you want me to merge it?&quot;
+              </p>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePRDecision(false)}
+                  disabled={isMerging}
+                  className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 py-2 text-xs font-semibold text-zinc-300 cursor-pointer"
+                >
+                  No, Reject PR
+                </button>
+                <button
+                  onClick={() => handlePRDecision(true)}
+                  disabled={isMerging}
+                  className="flex-1 rounded-xl bg-violet-600 hover:bg-violet-500 py-2 text-xs font-bold text-white shadow-lg cursor-pointer"
+                >
+                  {isMerging ? "Merging..." : "Yes, Merge PR"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {callState === "merged" && (
+            <div className="text-center py-2 space-y-2">
+              <div className="text-emerald-400 font-bold text-sm">✓ PR Merged Successfully</div>
+              <p className="text-xs text-zinc-400">
+                The hotfix was applied and the local server reloaded. The system is verified healthy!
+              </p>
+              <button
+                onClick={() => setCallState("idle")}
+                className="text-[10px] text-zinc-500 hover:text-zinc-400 underline font-semibold mt-2 cursor-pointer"
+              >
+                Dismiss Call Panel
+              </button>
+            </div>
+          )}
+
+          {callState === "rejected" && (
+            <div className="text-center py-2 space-y-2">
+              <div className="text-red-400 font-bold text-sm">PR Rejected</div>
+              <p className="text-xs text-zinc-400">
+                Stand down. The pull request remains open for your manual review.
+              </p>
+              <button
+                onClick={() => setCallState("idle")}
+                className="text-[10px] text-zinc-500 hover:text-zinc-400 underline font-semibold mt-2 cursor-pointer"
+              >
+                Dismiss Call Panel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-zinc-900 bg-zinc-950 py-8 text-center text-xs text-zinc-500">
