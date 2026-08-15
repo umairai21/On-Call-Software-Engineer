@@ -32,11 +32,15 @@ export default function Home() {
         console.warn(`📍 Code Location: ${data.errorDetails?.location}`);
         
         if (data.devinResult) {
-          if (data.devinResult.simulated) {
-            console.log("🚀 [Devin Bridge] Simulated Devin session logged to server console.");
+          if (data.devinResult.success) {
+            if (data.devinResult.simulated) {
+              console.log("🚀 [Devin Bridge] Simulated Devin session logged to server console.");
+            } else {
+              console.log("🚀 [Devin Bridge] Devin session successfully triggered!");
+              console.log("🔗 Track session here: " + data.devinResult.sessionUrl);
+            }
           } else {
-            console.log("🚀 [Devin Bridge] Devin session successfully triggered!");
-            console.log("🔗 Track session here: " + data.devinResult.sessionUrl);
+            console.error("❌ [Devin Bridge] Devin trigger failed: " + data.devinResult.error);
           }
         }
       } else {
